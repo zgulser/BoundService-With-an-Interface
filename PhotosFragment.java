@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.text.Editable;
@@ -89,9 +90,31 @@ public class PhotosFragment extends Fragment implements TextWatcher {
 
     private void generatePhotoItemList() {
 
-        ArrayList<IMItem> photosList = IMUtils.getMediaPhotoIMItemsSorted(mChatId);
-        MediaItemsAdapter photosAdapter = new MediaItemsAdapter(mContext, photosList, 0);
-        mPhotosGridView.setAdapter(photosAdapter);
+        new AsyncTask<Void, Void, Void>() {
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                if(!mContext.getIsServiceBound()){
+                    synchronized (mContext.mServiceLock){
+                        try {
+                            mContext.mServiceLock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+
+                ArrayList<IMItem> photosList = IMUtils.getMediaPhotoIMItemsSorted(mChatId);
+                MediaItemsAdapter photosAdapter = new MediaItemsAdapter(mContext, photosList, 0);
+                mPhotosGridView.setAdapter(photosAdapter);
+            }
+        }.execute();
     }
 
     private void saveScrollPosition() {

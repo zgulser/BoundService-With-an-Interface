@@ -1,4 +1,5 @@
 
+
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -27,6 +28,7 @@ import android.widget.CompoundButton;
 import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Desc: Custom gallery. Only includes images for now.
@@ -51,14 +54,14 @@ public class MediaManagerActivity extends FragmentActivity {
     private RadioButton mVideosButton;
     private RadioButton mAudiosButton;
     private int mCurrentPage = 0;
-    private boolean mBound = false;
+    private AtomicBoolean mBound = new AtomicBoolean(false);
     private String mMediaManagerChatId = null;
     private InteractionStateNotifierView mInteractionStateView;
     private int mSavedFilterType = ContactListManager.filterType;
     private LinkedHashMap<Integer, Fragment> mFragmentsHash = new LinkedHashMap<Integer, Fragment>();
     private MediaCategoriesPagerAdapter mMediaCategoriesPagerAdapter;
     private MediaItemThumbnailLoader mThumbnailService = null;
-    private Object mServiceLock = new Object();
+    public Object mServiceLock = new Object();
 
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
@@ -87,23 +90,32 @@ public class MediaManagerActivity extends FragmentActivity {
     public ServiceConnection mServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.i("Test", ">> Test loader bound ");
             MediaItemThumbnailLoader.LocalThumbnailBinder binder = (MediaItemThumbnailLoader.LocalThumbnailBinder) service;
             mThumbnailService = binder.getMediaItemThumbnailLoaderService();
-            mBound = true;
+            mBound.set(true);
+            synchronized (mServiceLock) {
+                mServiceLock.notifyAll();
+            }
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            mBound = false;
+            mBound.set(false);
         }
     };
 
     public MediaItemThumbnailLoader getMediaItemThumbnailLoaderService(){
 
-        if(mBound)
+        if(mBound.get())
             return mThumbnailService;
         else
             return null;
+    }
+
+    public boolean getIsServiceBound(){
+
+        return mBound.get();
     }
 
     private void updateInteractionStateNotification() {
@@ -119,10 +131,10 @@ public class MediaManagerActivity extends FragmentActivity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_media_manager);
 
+        bindToDownloaderService();
         createUIViews();
         initViewPager();
         setCheckedListeners();
-        bindToDownloaderService();
 
         getWindow().setSoftInputMode(
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
@@ -137,19 +149,19 @@ public class MediaManagerActivity extends FragmentActivity {
     }
 
     private void unbindToDownloaderService() {
-        if(mBound) {
+        if(mBound.get()) {
             unbindService(mServiceConnection);
-            mBound = false;
+            mBound.set(false);
         }
     }
 
     private void createUIViews() {
 
-        mTitlebarLayout = (LinearLayout) findViewById(R.id.titlebarLayout);
+        mTitlebarLayout = (RelativeLayout) findViewById(R.id.titlebarLayout);
         if (mTitlebarLayout != null)
             mPageTitle = (TextView) mTitlebarLayout.findViewById(R.id.title);
 
-        mCancelTextViewLayout = (LinearLayout) findViewById(R.id.lytTitleBarRightForwading);
+        mCancelTextViewLayout = (LinearLayout) findViewById(R.id.lytTitleBarRightMediaMan);
         mCancelTextViewLayout.setOnClickListener(new OnClickListener() {
 
             @Override

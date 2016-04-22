@@ -32,7 +32,6 @@ import com.readystatesoftware.viewbadger.BadgeView;
 
 import java.util.ArrayList;
 
-
 public class VideosFragment extends Fragment implements TextWatcher {
 
     private LayoutInflater inflater;
@@ -71,7 +70,7 @@ public class VideosFragment extends Fragment implements TextWatcher {
         View viewLayout = inflater.inflate(R.layout.videos_fragment,
                 container, false);
 
-        mVideosGridView = (GridView) viewLayout.findViewById(R.id.gridviewPhotos);
+        mVideosGridView = (GridView) viewLayout.findViewById(R.id.gridviewVideos);
         mChatId = getArguments().getString(MediaManagerUtils.MEDIA_CHATID_KEY);
         generateVideoItemList();
 
@@ -96,9 +95,31 @@ public class VideosFragment extends Fragment implements TextWatcher {
 
     private void generateVideoItemList() {
 
-        ArrayList<IMItem> photosList = IMUtils.getMediaPhotoIMItemsSorted(mChatId);
-        MediaItemsAdapter photosAdapter = new MediaItemsAdapter(mContext, photosList, 1);
-        mVideosGridView.setAdapter(photosAdapter);
+        new AsyncTask<Void, Void, Void>() {
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                if(!mContext.getIsServiceBound()){
+                    synchronized (mContext.mServiceLock){
+                        try {
+                            mContext.mServiceLock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+
+                ArrayList<IMItem> videoList = IMUtils.getMediaVideoIMItemsSorted(mChatId);
+                MediaItemsAdapter photosAdapter = new MediaItemsAdapter(mContext, videoList, 1);
+                mVideosGridView.setAdapter(photosAdapter);
+            }
+        }.execute();
     }
 
     private void initReceiver() {
